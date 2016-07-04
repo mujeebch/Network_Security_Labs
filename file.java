@@ -7,6 +7,7 @@ public static void main (String args[]) throws FileNotFoundException
     
 Scanner sc = new Scanner(new File(args[0]));
 int count=0;
+int test=0;
 while(sc.hasNext()){
     sc.next();
     count++;
