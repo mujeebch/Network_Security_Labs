@@ -1,0 +1,128 @@
+#+LaTeX_CLASS: article
+#+OPTIONS:   TeX:t LaTeX:t skip:nil d:nil todo:t pri:nil tags:not-in-toc
+#+OPTIONS:   H:2 num:t toc:nil \n:nil @:t ::t |:t ^:nil -:t f:t *:t 
+#+LATEX_HEADER: \usepackage{helvet}
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry} %  margins
+#+LATEX_HEADER: \renewcommand{\familydefault}{\sfdefault}
+
+#+TITLE:    Lab 7: Wireless Networks
+#+AUTHOR:   50.012 Networks
+#+DATE:     Hand-out: Nov 17 \\  eDimension hand-in: Nov 24
+
+* Objectives
+- Understand 802.11 infrastructure mode in detail, e.g., using wireshark in monitor mode
+- Observe and experiment with ad-hoc mode and access points
+- Note: configuration of the wireless settings can be tricky. If you get stuck, try to reboot
+* Experiments
+ # - Note: most commands will have to be run as root. Use *sudo su* to permanently become root in the current terminal.  
+** Set up your machine
+- Install the script from eDimension folder: =bash install.sh=
+  - During installation, kismet might ask you to say "yes" and your username, i.e. "student". Use =Tab= to switch between buttons/fields.
+- Disconnect from the wired network, if you are connected, using the applet in the top right
+** Traffic sniffing with wireshark
+*** Simple sniffing in promiscious mode
+- Connect to the =SUTD_Student= network with your normal account
+- Use =ifconfig= to find your IP and note it down
+- Use =iwconfig= to find out more about your 802.11 configuration. In particular, find which 802.11 standard is supported, and which frequency you are using.
+- Start =sudo wireshark= and make sure to set your card to =promiscious mode=
+- Observe the ongoing traffic, what can you see? What can't you see?
+*** Sniffing of SUTD_Guest
+- Connect to =SUTD_Guest=. You don't need to use the portal to authenticate yourself. The portal will simply configure the network to allow your traffic to be forwarded through the AP. Associating to the AP is enough.
+- Monitor the traffic in promiscious mode in wireshark again. Can you observe interesting traffic? What did you see? This might only work during lab hours.
+** Monitor mode
+- Note: please use =sudo service network-manager stop= to stop the network manager from interfering. You will lose Internet access.
+*** Monitor mode I: Wireshark
+- Take down your wlan0 interface manually: =sudo ifconfig wlan0 down=
+ # - Activate /monitor/ mode: =sudo iwconfig wlan0 mode monitor=
+- Activate /monitor/ mode: =sudo airmon-ng start wlan0=
+  - In monitor mode, the interface will accept frames /without being associated to the corresponding access point/
+  - This command will create the =mon0= interface. Use that interface in wireshark to listen on.
+ # - Bring up the interface again: =sudo ifconfig wlan0 up=
+ # - Use =ifconfig= and =iwconfig= again. What changed? Why?
+- Now start a new capturing session in wireshark: 
+  - What kind of messages are you capturing, and why?
+    - Hint: you can filter out the most common type of message with =!(wlan.fc.type_subtype==8)= as filter in wireshark.
+  - Can you see other machines' traffic? 
+    - In particular, do you see =Probe request= packets? For which ESSID are they asking?
+  - Do you see ACKs? What is their source address, and why?
+*** Monitor mode II: Kismet
+- kismet is a tool to analyze wireless network traffic
+- It is actually two applications: a server part, and a gui
+ # - Note: the gui is /pseudo-command-line/: it uses ASCII graphics, but your mouse should still work to select "buttons" and menus.
+- start =sudo kismet_server= from the command line, with =mon0= set up as described previously
+- start the gui by typing =kismon=. If you have problems, locate the kismon/bin folder that was created by the install script, change into the folder and run =./kismon=
+ # - A couple of pop-ups come up, choose the default selection each time. Close the server terminal (don't stop the server). Select =mon0= as monitored interface in the pop-up.
+- You should be on the main menu now, seeing the wireless traffic being analyzed
+- Wait a couple of minutes, how many BSSIDs are encountered? What do you think how these are related? Which channels are used by the APs?
+- In view->network type, select only "probe network". What networks do you see, why?
+*** Restoring normal networking
+- After you are done with monitor mode, you need to restore normal networking:
+  - stop the running kismet_server by pressing CTRL-C
+  - =sudo airmon-ng stop mon0=
+  - =sudo ifconfig wlan0 up=
+  - =sudo service network-manager start=
+** Ad-hoc Mode 
+- Team up with another person or pair. One of you will set up an /ad-hoc/ network (TeamA), and the other one will connect to it (TeamB).
+- Both teams need to restart their desktops, and make sure that they DO NOT automatically connect to any wireless network. TeamB should also disconnect from wired network.
+ # - First, start by =ping='ing each other. What is the RTT?  
+- TeamA uses the network applet in the top right to "Create a new wifi network". Wired network should also be connected.
+  - Choose an appropriate network name and *no security/access key*
+  - Team B should now see and be able to connect to your new network. Both sides can check their IP configuration with =ifconfig= and =route=. Can you =ping= each other? 
+  - Team B should still have its wired adapter disconnected. Can Team B ping the server, i.e. 10.0.1.10? Why? How did we define ad-hoc mode?
+ # - Start wireshark in promiscious mode again. 
+** Set up your own infrastructure network
+- It is actually fairly simple to set up your PC to act similar to an home "router"
+- You can now turn on network-manager again =sudo service network-manager start=
+- If do not use the lab machines, use "iw list" to find out if your wlan card support =AP= mode. This part requires a card that does support it (look for "Supported interface modes: AP")
+ # - Download the script at https://gist.githubusercontent.com/dashohoxha/5767262/raw/ce7a1af750f7109c9ea1e2aa497eff47ae22f763/install_wifi_access_point.sh
+- Enable your wired network with the applet on the top right again. Disconnect from =SUTD_Student=
+- Run =sudo ap-hotspot configure=
+  - Use the =eth0= interface as first interface, and =wlan0= as second. Provide an SSID and password (8+ characters) for your access point.
+- Start the AP with =sudo ap-hotspot start=
+- Ask a friend to connect to your access point
+  - Which IP address is he getting?
+  - If he disconnects from the wired network, can he ping the server
+    in the lab, i.e. 10.0.1 .10? Why?
+  - Hint: use =wireshark= and =route= on your machine to figure out what is going on
+  - Hint2: this configuration is actually more like a router, and less like the layer 2 access point discussed in class
+** COMMENT AP security
+   
+*** COMMENT "Hidden" Access Points
+- A "hidden" access point is set up in the lab. The lecturer PC is configured to be connected to that AP all time.
+- Your job is to use the 
+*** MAC address filtering
+  - MAC-address filter: use =iwpriv wlan0 addmac <mac>=, =iwpriv wlan0 maccmd 1=
+
+* What to Hand in
+** eDimension submission:
+Please provide a writeup (in PDF format with your name) that includes the following information:
+- While using wireshark on SUTD_Students, what did you see/not see? In particular, did you see other people's traffic, and what kind?
+- While connected to SUTD_Guest, do you see different kind of traffic? Why?
+- Using monitor mode, what kind of traffic do you see, and why? 
+   - Can you see queries for non-SUTD ESSIDs? 
+   - Why do you see these?
+   - Why is the source address of ACKs the way it is?
+- How many networks/BSSIDs did you see with kismet? Which channels were used?
+- Did ad-hoc mode work for you? Was TeamB able to ping the server through TeamA?
+- Did the "router" mode work? How is the setup different from a layer 2 access point?
+** Checkoff:
+- No checkoff required if you submitted your reply sheet
+* COMMENT
+** Old
+- Wireshark with WPA2: https://ask.wireshark.org/questions/27464/how-to-decrypt-wpa2-psk-captured-traffic-on-wireshark-what-is-the-expected-traffic-to-be-captured-in-wpa2-psk-setup
+- Possible, but only with WPA2 private mode.
+  - Could be combined with "access point"
+- iwlist scan, there should be a \00\00\00\00 bssid
+  - Hidden ap. mac is 18:64:72:56:01:06 (very similar to SUTD_Guest one)
+  - Unfortunately, injecting packets does not seem possible straight away
+- Admin set up:
+  - Use static desktop to connect to SUTD_Guest, and create some traffic
+    - something that generates constant http traffic?
+    - lets just ping with a message or similar
+  - Use my white AP as "hidden AP", connect my laptop to it.
+** Todo New:
+- install kismon and python things
+- DONE put kismet conf file into install script, select mon0 automatically
+- DONE figure out how to put kismon into search path
+** Meshing next week:
+https://wireless.wiki.kernel.org/en/developers/documentation/ieee80211/802.11s
